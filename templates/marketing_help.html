@@ -2,19 +2,78 @@
 {% block title %}Market Insights{% endblock %}
 {% block content %}
 <div class="card p-4">
-  <h3 class="mb-4">📊 Market Insights</h3>
-  <form method="post" action="/marketing_help">
+  <h3 class="mb-4">📊 Market Insights (Streaming)</h3>
+  <form id="market-form">
     <div class="mb-3">
-      <label for="user_question" class="form-label">Enter your query:</label>
-      <textarea class="form-control" id="user_question" name="user_question" rows="4" placeholder="e.g., What are the current trends for wheat pricing?" required>{{ user_question if user_question is defined else "" }}</textarea>
+      <label for="user_question" class="form-label">Enter your market query:</label>
+      <textarea class="form-control" id="user_question" name="user_question" rows="4"
+        placeholder="e.g., What are the current price trends for wheat? Which regions have high demand for corn?" required></textarea>
     </div>
-    <button type="submit" class="btn btn-primary">Get Insights</button>
+    <div class="d-flex gap-2">
+      <button type="submit" id="get-insights" class="btn btn-primary">Get Insights</button>
+      <button type="button" id="stop-answer" class="btn btn-danger" disabled>Stop Answer</button>
+    </div>
   </form>
-  {% if advice %}
-  <div class="mt-4 response-box">
-    <strong>Advice:</strong><br>
-    {{ advice | safe }}
-  </div>
-  {% endif %}
+
+  <div class="mt-4 response-box" id="insights-box" style="white-space: pre-line;"></div>
 </div>
+
+<script>
+  const form = document.getElementById('market-form');
+  const getInsightsButton = document.getElementById('get-insights');
+  const stopAnswerButton = document.getElementById('stop-answer');
+  const insightsBox = document.getElementById('insights-box');
+  let controller; // AbortController instance
+
+  form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      insightsBox.innerHTML = '<em>Loading insights...</em>';
+      getInsightsButton.disabled = true;
+      stopAnswerButton.disabled = false;
+
+      controller = new AbortController();
+      const formData = new FormData(form);
+
+      try {
+          // Changed endpoint URL
+          const response = await fetch('/marketing_help_stream', {
+              method: 'POST',
+              body: formData,
+              signal: controller.signal
+          });
+
+          if (!response.ok) {
+              insightsBox.textContent = `Error: ${response.status} ${response.statusText}`;
+              const errorBody = await response.text();
+              if (errorBody) insightsBox.textContent += `\nDetails: ${errorBody}`;
+              return;
+          }
+
+          insightsBox.innerHTML = ''; // Clear previous content
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder('utf-8');
+
+          while (true) {
+              const { value, done } = await reader.read();
+              if (done) break;
+              insightsBox.innerHTML += decoder.decode(value, { stream: true });
+          }
+      } catch (error) {
+          if (error.name === 'AbortError') {
+              insightsBox.innerHTML += "\n[Answering stopped by user.]";
+          } else {
+              insightsBox.textContent = `\n[Error fetching stream: ${error.message}]`;
+          }
+      } finally {
+          getInsightsButton.disabled = false;
+          stopAnswerButton.disabled = true;
+      }
+  });
+
+  stopAnswerButton.addEventListener('click', () => {
+      if (controller) {
+          controller.abort();
+      }
+  });
+</script>
 {% endblock %}
