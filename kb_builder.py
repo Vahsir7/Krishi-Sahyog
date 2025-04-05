@@ -1,7 +1,7 @@
 # kb_builder.py
-from langchain.document_loaders import TextLoader
-from langchain.vectorstores import FAISS
-from langchain.embeddings import SentenceTransformerEmbeddings
+from langchain_community.document_loaders import TextLoader
+from langchain_community.vectorstores import FAISS
+from langchain_community.embeddings import SentenceTransformerEmbeddings
 
 def build_vector_store(filepath="data/agri_guide.txt"):
     loader = TextLoader(filepath)

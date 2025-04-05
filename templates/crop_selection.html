@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Crop Selection</h2>
+<form method="post" action="/crop_selection">
+    <div class="mb-3">
+        <label for="soil_ph" class="form-label">Soil pH</label>
+        <input type="number" step="0.1" class="form-control" id="soil_ph" name="soil_ph" placeholder="e.g., 6.5" required>
+    </div>
+    <div class="mb-3">
+        <label for="soil_moisture" class="form-label">Soil Moisture (%)</label>
+        <input type="number" step="0.1" class="form-control" id="soil_moisture" name="soil_moisture" placeholder="e.g., 45" required>
+    </div>
+    <div class="mb-3">
+        <label for="temperature" class="form-label">Temperature (°C)</label>
+        <input type="number" step="0.1" class="form-control" id="temperature" name="temperature" placeholder="e.g., 27" required>
+    </div>
+    <div class="mb-3">
+        <label for="rainfall" class="form-label">Rainfall (mm)</label>
+        <input type="number" step="0.1" class="form-control" id="rainfall" name="rainfall" placeholder="e.g., 230" required>
+    </div>
+    <button type="submit" class="btn btn-primary">Get Crop Suggestion</button>
+</form>
+
+{% if details is defined %}
+<div class="mt-4">
+    <h4>Suggested Crop:</h4>
+    <p>{{ details }}</p>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,4 +1,4 @@
-#!/home/rishav/Desktop/Codes/Smart-Agriculture-Ai/SmartAgri-env/bin/python
+#!/home/rishav/Desktop/Codes/Smart-Agriculture-Ai/.venv/bin/python3.12
 # -*- coding: utf-8 -*-
 import re
 import sys
