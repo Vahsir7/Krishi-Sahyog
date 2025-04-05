@@ -106,3 +106,61 @@ User Query: "{query}"
 Based on the historical market data, provide detailed market insights and recommendations.
 """
     return query_ollama(prompt)
+
+import asyncio
+import os
+
+# Ensure OLLAMA_PATH is correctly defined:
+OLLAMA_PATH = "/usr/local/bin/ollama"  # adjust if needed
+
+import re
+import asyncio
+
+import re
+import asyncio
+
+# Helper function to strip ANSI escape sequences
+def strip_ansi(text: str) -> str:
+    ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
+    return ansi_escape.sub('', text)
+
+async def stream_query_ollama(prompt: str):
+    process = await asyncio.create_subprocess_exec(
+        OLLAMA_PATH, "run", "llama2:7b-chat",
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    
+    # Send the prompt
+    process.stdin.write(prompt.encode("utf-8"))
+    await process.stdin.drain()
+    process.stdin.close()
+
+    buffer = ""
+    # Read one character at a time from stdout
+    while True:
+        char = await process.stdout.read(1)
+        if not char:
+            break
+        decoded_char = strip_ansi(char.decode("utf-8"))
+        # If a whitespace is encountered, yield the buffered word plus the space
+        if decoded_char.isspace():
+            if buffer:
+                yield buffer + decoded_char
+                buffer = ""
+            else:
+                yield decoded_char
+            # Optional delay to simulate typing effect
+            await asyncio.sleep(0.05)
+        else:
+            buffer += decoded_char
+    if buffer:
+        yield buffer  # yield any remaining characters
+
+    # Optionally, process stderr (if any)
+    stderr = await process.stderr.read()
+    if stderr:
+        yield "\n[ERROR] " + strip_ansi(stderr.decode("utf-8"))
+    
+    await process.wait()
