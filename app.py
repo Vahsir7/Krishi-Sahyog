@@ -1,4 +1,6 @@
 # app.py
+# to run this code, use the command: uvicorn app:app --reload
+
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -23,8 +25,11 @@ async def farmer_help(request: Request):
 
 @app.post("/farmer_help", response_class=HTMLResponse)
 async def farmer_help_post(request: Request, user_question: str = Form(...)):
+    print("User question received:", user_question)  # Debug print to see the value
     advice = ask_ollama_crop_advisor(user_question)
+    print("Advice returned:", advice)  # Debug print to see the value
     return templates.TemplateResponse("farmer_help.html", {"request": request, "advice": advice, "user_question": user_question})
+
 
 # Market help page using the NLP market advisor
 @app.get("/marketing_help", response_class=HTMLResponse)

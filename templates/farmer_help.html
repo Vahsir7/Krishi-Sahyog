@@ -1,19 +1,25 @@
 {% extends "base.html" %}
 
-{% block content %}
-<h2>Farmer Help</h2>
-<form method="post" action="/farmer_help">
-    <div class="mb-3">
-        <label for="user_question" class="form-label">Ask your farming question:</label>
-        <input type="text" class="form-control" id="user_question" name="user_question" placeholder="Type your question here" value="{{ user_question if user_question is defined else '' }}" required>
-    </div>
-    <button type="submit" class="btn btn-primary">Submit</button>
-</form>
+{% block title %}Farmer Help - Smart Agriculture AI{% endblock %}
 
-{% if advice is defined %}
-<div class="mt-4">
-    <h4>Advice:</h4>
-    <p>{{ advice }}</p>
+{% block content %}
+<div class="container my-5">
+  <div class="card shadow p-4">
+    <h3 class="mb-4">🌾 Smart Crop Advisor</h3>
+    <form method="post" action="/farmer_help">
+      <div class="mb-3">
+        <label for="user_question" class="form-label fw-semibold">Enter your field conditions or question:</label>
+        <textarea class="form-control" id="user_question" name="user_question" rows="4" placeholder="e.g., My field has soil pH of 6.7, moisture at 35%, temp 28°C..." required>{{ user_question if user_question is defined else '' }}</textarea>
+      </div>
+      <button type="submit" class="btn btn-success w-100">🌿 Get AI Advice</button>
+    </form>
+
+    {% if advice %}
+    <div class="mt-4 border rounded p-3 bg-light">
+      <h5 class="text-success">🌟 AI-Powered Advice</h5>
+      {{ advice }}
+    </div>
+    {% endif %}
+  </div>
 </div>
-{% endif %}
 {% endblock %}
