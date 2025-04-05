@@ -1,53 +1,57 @@
-# app.py
-# to run this code, use the command: uvicorn app:app --reload
-
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from nlp_advisor import ask_ollama_crop_advisor, ask_ollama_market_advisor
+from agents.custom_agent import get_farmer_advice, get_market_advice
 
 app = FastAPI()
-
-# Mount static files if you have any (like CSS)
 app.mount("/static", StaticFiles(directory="static"), name="static")
-
 templates = Jinja2Templates(directory="templates")
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     return templates.TemplateResponse("base.html", {"request": request})
 
-# Farmer help page using the NLP crop advisor
+# Farmer Help Page
 @app.get("/farmer_help", response_class=HTMLResponse)
 async def farmer_help(request: Request):
     return templates.TemplateResponse("farmer_help.html", {"request": request})
 
 @app.post("/farmer_help", response_class=HTMLResponse)
 async def farmer_help_post(request: Request, user_question: str = Form(...)):
-    print("User question received:", user_question)  # Debug print to see the value
-    advice = ask_ollama_crop_advisor(user_question)
-    print("Advice returned:", advice)  # Debug print to see the value
-    return templates.TemplateResponse("farmer_help.html", {"request": request, "advice": advice, "user_question": user_question})
+    print(f"User question: {user_question}")
+    advice = get_farmer_advice(user_question)
+    
+    return templates.TemplateResponse("farmer_help.html", {
+        "request": request,
+        "advice": advice,
+        "user_question": user_question
+    })
 
-
-# Market help page using the NLP market advisor
+# Market Help Page
 @app.get("/marketing_help", response_class=HTMLResponse)
 async def marketing_help(request: Request):
     return templates.TemplateResponse("marketing_help.html", {"request": request})
 
 @app.post("/marketing_help", response_class=HTMLResponse)
 async def marketing_help_post(request: Request, user_question: str = Form(...)):
-    advice = ask_ollama_market_advisor(user_question)
-    return templates.TemplateResponse("marketing_help.html", {"request": request, "advice": advice, "user_question": user_question})
+    advice = get_market_advice(user_question)
+    return templates.TemplateResponse("marketing_help.html", {
+        "request": request,
+        "advice": advice,
+        "user_question": user_question
+    })
 
-# Optionally, a crop selection page that also uses NLP for more detailed advice.
+# Crop Selection Page (using farmer advice logic)
 @app.get("/crop_selection", response_class=HTMLResponse)
 async def crop_selection(request: Request):
     return templates.TemplateResponse("crop_selection.html", {"request": request})
 
 @app.post("/crop_selection", response_class=HTMLResponse)
 async def crop_selection_post(request: Request, user_question: str = Form(...)):
-    # Here you could combine numeric field inputs with NLP reasoning
-    advice = ask_ollama_crop_advisor(user_question)
-    return templates.TemplateResponse("crop_selection.html", {"request": request, "advice": advice, "user_question": user_question})
+    advice = get_farmer_advice(user_question)
+    return templates.TemplateResponse("crop_selection.html", {
+        "request": request,
+        "advice": advice,
+        "user_question": user_question
+    })
