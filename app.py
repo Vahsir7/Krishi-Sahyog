@@ -147,6 +147,12 @@ async def market_help_page(request: Request):
     return templates.TemplateResponse("marketing_help.html", {"request": request})
 
 
+@app.get("/about", response_class=HTMLResponse)
+async def about_page(request: Request):
+    """Serves the About Us page."""
+    return templates.TemplateResponse("about.html", {"request": request})
+
+
 # --- Crop Suggestion Route (Using New Agent Function) ---
 @app.post("/suggest_crop", response_class=HTMLResponse)
 async def suggest_crop_post(
