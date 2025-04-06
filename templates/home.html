@@ -1,0 +1,20 @@
+{% extends "base.html" %} {# This uses your existing base template #}
+
+{% block title %}Welcome - Smart Agriculture AI{% endblock %} {# Sets the page title #}
+
+{% block content %} {# This fills the content block defined in base.html #}
+<div class="container mt-4">
+  <h1>Welcome to the Smart Agriculture AI Advisor</h1>
+  <p class="lead">
+    This tool helps farmers, researchers, and experts collaborate for sustainable and optimized farming practices.
+  </p>
+  <p>
+    Use the navigation links above to:
+  </p>
+  <ul>
+    <li>Get personalized advice based on your farm's data (<a href="/farmer_help">Farmer Help</a>).</li>
+    <li>Analyze market trends for profitable crops (<a href="/marketing_help">Market Insights</a>).</li>
+    <li>Find the most sustainable crop for your conditions (<a href="/crop_selection">Crop Selection</a>).</li>
+  </ul>
+</div>
+{% endblock %}
