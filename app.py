@@ -49,17 +49,12 @@ except ImportError as e:
     agent = DummyAgent() # Use the dummy agent
 
 # --- Initialize FastAPI App ---
-app = FastAPI(title="Smart Agriculture AI")
+app = FastAPI(title="Krishi Sahyog")
 
 # --- Setup Static Files & Templates ---
 # Adjust paths if your structure is different (e.g., static/templates inside Smart Agri folder)
 static_dir = os.path.join(project_root, "static")
 templates_dir = os.path.join(project_root, "templates")
-
-if not os.path.isdir(static_dir):
-     static_dir = os.path.join(project_root, "Smart Agri", "static")
-if not os.path.isdir(templates_dir):
-     templates_dir = os.path.join(project_root, "Smart Agri", "templates")
 
 if os.path.isdir(static_dir):
      app.mount("/static", StaticFiles(directory=static_dir), name="static")
