@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Farmer Help{% endblock %}
+{% block content %}
+<div class="card p-4">
+  <h3 class="mb-4">🌱 Farmer Assistance (Streaming)</h3>
+  <form id="farmer-form">
+    <div class="mb-3">
+      <label for="user_question" class="form-label">Enter your query:</label>
+      <textarea class="form-control" id="user_question" name="user_question" rows="4"
+        placeholder="e.g., I have a field with soil pH of 6.7, soil moisture at 35%, ..." required></textarea>
+    </div>
+    <div class="d-flex gap-2">
+      <button type="submit" id="get-advice" class="btn btn-success">Get Advice</button>
+      <button type="button" id="stop-answer" class="btn btn-danger" disabled>Stop Answer</button>
+    </div>
+  </form>
+
+  <div class="mt-4 response-box" id="advice-box" style="white-space: pre-line;"></div>
+</div>
+
+<script>
+  const form = document.getElementById('farmer-form');
+  const getAdviceButton = document.getElementById('get-advice');
+  const stopAnswerButton = document.getElementById('stop-answer');
+  const adviceBox = document.getElementById('advice-box');
+  let controller; // AbortController instance
+
+  form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      adviceBox.innerHTML = '<em>Loading advice...</em>';
+      // Disable the Get Advice button and enable Stop Answer
+      getAdviceButton.disabled = true;
+      stopAnswerButton.disabled = false;
+      
+      controller = new AbortController();
+      const formData = new FormData(form);
+      
+      try {
+          const response = await fetch('/farmer_help_stream', {
+              method: 'POST',
+              body: formData,
+              signal: controller.signal
+          });
+          
+          if (!response.ok) {
+              adviceBox.innerHTML = 'Something went wrong!';
+              return;
+          }
+          
+          adviceBox.innerHTML = '';
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder('utf-8');
+          
+          while (true) {
+              const { value, done } = await reader.read();
+              if (done) break;
+              adviceBox.innerHTML += decoder.decode(value, { stream: true });
+          }
+      } catch (error) {
+          if (error.name === 'AbortError') {
+              adviceBox.innerHTML += "\n[Answering stopped by user.]";
+          } else {
+              adviceBox.innerHTML += "\n[Error: " + error.message + "]";
+          }
+      } finally {
+          // Re-enable Get Advice button and disable Stop Answer button
+          getAdviceButton.disabled = false;
+          stopAnswerButton.disabled = true;
+      }
+  });
+
+  stopAnswerButton.addEventListener('click', () => {
+      if (controller) {
+          controller.abort();
+      }
+  });
+</script>
+{% endblock %}
