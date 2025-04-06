@@ -1,38 +1,52 @@
-# nlp_advisor.py
 import subprocess
 import pandas as pd
+import numpy as np
+import faiss
+from sklearn.preprocessing import StandardScaler
+from sentence_transformers import SentenceTransformer
 
-# Functions to load your datasets
+# Load datasets
 def load_farmer_data():
     return pd.read_csv("data/farmer_advisor_dataset.csv")
 
 def load_market_data():
     return pd.read_csv("data/market_researcher_dataset.csv")
 
-# Generate a brief context from the farmer dataset (customize as needed)
-def generate_context_for_crop():
-    df = load_farmer_data()
-    sample = df.head(5).to_string(index=False)
-    context = f"Farmer Dataset Sample:\n{sample}"
-    return context
+# Sentence transformer model
+embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
-# Generate a brief context from the market dataset (customize as needed)
-def generate_context_for_market():
-    df = load_market_data()
-    sample = df.head(5).to_string(index=False)
-    context = f"Market Dataset Sample:\n{sample}"
-    return context
+# Normalize and embed context using FAISS
+def prepare_faiss_index(df):
+    # Combine text data into single strings per row
+    combined = df.astype(str).agg(" ".join, axis=1).values
+    embeddings = embedder.encode(combined)
+    
+    # Create FAISS index
+    dimension = embeddings.shape[1]
+    index = faiss.IndexFlatL2(dimension)
+    index.add(np.array(embeddings))
+    return index, combined
 
-# Path to the Ollama executable; adjust if necessary
-OLLAMA_PATH = "/usr/local/bin/ollama"  # Ensure 'ollama' is in your PATH; otherwise, provide the full path
+# Retrieve top-k matching context rows
+def retrieve_similar_context(query, index, combined_texts, k=3):
+    query_vec = embedder.encode([query])
+    distances, indices = index.search(np.array(query_vec), k)
+    return [combined_texts[i] for i in indices[0]]
 
-# Function to query the crop advisor using the llama2-7b-chat model
+# Path to Ollama executable
+OLLAMA_PATH = "/usr/local/bin/ollama"
+
+# Ask crop advisor
 def ask_ollama_crop_advisor(query):
-    context = generate_context_for_crop()
+    df = load_farmer_data()
+    index, combined = prepare_faiss_index(df)
+    top_matches = retrieve_similar_context(query, index, combined)
+    
+    context = "\n".join(top_matches)
     prompt = f"""
 You are an expert crop advisor trained on agricultural data.
 
-Dataset Context:
+Relevant Context:
 {context}
 
 A farmer asks: "{query}"
@@ -46,44 +60,40 @@ Based on the above data and conditions, suggest 1-3 suitable crops along with re
             capture_output=True,
             text=True
         )
-        # Check if the subprocess ran successfully
-        if result.returncode != 0:
-            print("Subprocess error:", result.stderr.strip())
+        if result.returncode != 0 or not result.stdout.strip():
             return "Error occurred while getting advice."
-        # Check if the output is empty
-        if not result.stdout.strip():
-            print("Subprocess output is empty.")
-            return "No advice returned from model."
-        # Print the output for debugging
-        print("Subprocess output:", result.stdout.strip())  # Debug print
-        output = result.stdout.strip()
-        if not output:
-            # Print stderr to help diagnose issues
-            print("Subprocess stderr:", result.stderr.strip())
-        print("Ollama output:", output)  # Debug print
-        return output if output else "No advice returned from model."
+        return result.stdout.strip()
     except Exception as e:
         print("Error:", e)
         return "Error occurred while getting advice."
 
-# Function to query the market advisor using the llama2-7b-chat model
+# Ask market advisor
 def ask_ollama_market_advisor(query):
-    context = generate_context_for_market()
+    df = load_market_data()
+    index, combined = prepare_faiss_index(df)
+    top_matches = retrieve_similar_context(query, index, combined)
+
+    context = "\n".join(top_matches)
     prompt = f"""
 You are an expert market advisor trained on agricultural market data.
 
-Dataset Context:
+Relevant Context:
 {context}
 
 A user asks: "{query}"
 
 Based on the dataset, provide market insights and recommendations regarding crop pricing, demand trends, and competitor analysis.
 """
-    result = subprocess.run(
-        [OLLAMA_PATH, "run", "llama2:7b-chat"],
-        input=prompt,
-        capture_output=True,
-        text=True
-    )
-
-    return result.stdout.strip()
+    try:
+        result = subprocess.run(
+            [OLLAMA_PATH, "run", "llama2:7b-chat"],
+            input=prompt,
+            capture_output=True,
+            text=True
+        )
+        if result.returncode != 0 or not result.stdout.strip():
+            return "Error occurred while getting advice."
+        return result.stdout.strip()
+    except Exception as e:
+        print("Error:", e)
+        return "Error occurred while getting advice."
