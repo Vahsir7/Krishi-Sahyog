@@ -1,23 +1,34 @@
 {% extends "base.html" %}
 {% block title %}Market Insights{% endblock %}
+
 {% block content %}
-<div class="card p-4">
-  <h3 class="mb-4">📊 Market Insights (Streaming)</h3>
-  <form id="market-form">
-    <div class="mb-3">
-      <label for="user_question" class="form-label">Enter your market query:</label>
-      <textarea class="form-control" id="user_question" name="user_question" rows="4"
-        placeholder="e.g., What are the current price trends for wheat? Which regions have high demand for corn?" required></textarea>
-    </div>
-    <div class="d-flex gap-2">
-      <button type="submit" id="get-insights" class="btn btn-primary">Get Insights</button>
-      <button type="button" id="stop-answer" class="btn btn-danger" disabled>Stop Answer</button>
-    </div>
-  </form>
+<div class="card">
+  <div class="card-header">
+     <h4 class="mb-0"><i class="bi bi-graph-up"></i> Market Insights (Streaming)</h4>
+  </div>
+  <div class="card-body">
+    <p class="card-text text-muted mb-4">Ask about crop prices, market trends, demand, or related economic factors.</p>
+    <form id="market-form">
+      <div class="mb-3">
+        <label for="user_question" class="form-label">Enter your market query:</label>
+        <textarea class="form-control" id="user_question" name="user_question" rows="4"
+          placeholder="e.g., What are the current price trends for wheat? Which regions have high demand for organic vegetables? How have fertilizer costs changed recently?" required></textarea>
+      </div>
+      <div class="d-flex gap-2">
+        <button type="submit" id="get-insights" class="btn btn-primary"><i class="bi bi-search"></i> Get Insights</button> {# Changed to btn-primary #}
+        <button type="button" id="stop-answer" class="btn btn-danger" disabled><i class="bi bi-stop-circle"></i> Stop</button>
+      </div>
+    </form>
 
-  <div class="mt-4 response-box" id="insights-box" style="white-space: pre-line;"></div>
+     <div class="response-box" id="insights-box">
+        Enter your query above and click "Get Insights". The response will appear here.
+     </div>
+  </div>
 </div>
+{% endblock %}
 
+{% block scripts %}
+{# Keep the existing script block from your original file #}
 <script>
   const form = document.getElementById('market-form');
   const getInsightsButton = document.getElementById('get-insights');
@@ -27,7 +38,7 @@
 
   form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      insightsBox.innerHTML = '<em>Loading insights...</em>';
+      insightsBox.innerHTML = '<div class="d-flex align-items-center"> <strong role="status">Loading insights...</strong> <div class="spinner-border spinner-border-sm ms-auto" aria-hidden="true"></div> </div>'; // Bootstrap spinner
       getInsightsButton.disabled = true;
       stopAnswerButton.disabled = false;
 
@@ -35,7 +46,6 @@
       const formData = new FormData(form);
 
       try {
-          // Changed endpoint URL
           const response = await fetch('/marketing_help_stream', {
               method: 'POST',
               body: formData,
@@ -43,13 +53,12 @@
           });
 
           if (!response.ok) {
-              insightsBox.textContent = `Error: ${response.status} ${response.statusText}`;
               const errorBody = await response.text();
-              if (errorBody) insightsBox.textContent += `\nDetails: ${errorBody}`;
+              insightsBox.innerHTML = `<span class="text-danger">Error: ${response.status} ${response.statusText}.</span>` + (errorBody ? `<br><small class='text-danger'>Details: ${errorBody}</small>` : '');
               return;
           }
 
-          insightsBox.innerHTML = ''; // Clear previous content
+          insightsBox.innerHTML = ''; // Clear loading message
           const reader = response.body.getReader();
           const decoder = new TextDecoder('utf-8');
 
@@ -59,10 +68,10 @@
               insightsBox.innerHTML += decoder.decode(value, { stream: true });
           }
       } catch (error) {
-          if (error.name === 'AbortError') {
-              insightsBox.innerHTML += "\n[Answering stopped by user.]";
+           if (error.name === 'AbortError') {
+              insightsBox.innerHTML += "\n<strong class='text-warning'>[Answering stopped by user.]</strong>";
           } else {
-              insightsBox.textContent = `\n[Error fetching stream: ${error.message}]`;
+              insightsBox.innerHTML += `\n<strong class='text-danger'>[Error fetching stream: ${error.message}]</strong>`;
           }
       } finally {
           getInsightsButton.disabled = false;

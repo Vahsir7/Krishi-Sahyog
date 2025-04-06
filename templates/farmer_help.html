@@ -1,23 +1,34 @@
 {% extends "base.html" %}
 {% block title %}Farmer Help{% endblock %}
+
 {% block content %}
-<div class="card p-4">
-  <h3 class="mb-4">🌱 Farmer Assistance (Streaming)</h3>
-  <form id="farmer-form">
-    <div class="mb-3">
-      <label for="user_question" class="form-label">Enter your query:</label>
-      <textarea class="form-control" id="user_question" name="user_question" rows="4"
-        placeholder="e.g., I have a field with soil pH of 6.7, soil moisture at 35%, ..." required></textarea>
-    </div>
-    <div class="d-flex gap-2">
-      <button type="submit" id="get-advice" class="btn btn-success">Get Advice</button>
-      <button type="button" id="stop-answer" class="btn btn-danger" disabled>Stop Answer</button>
-    </div>
-  </form>
+<div class="card">
+  <div class="card-header">
+    <h4 class="mb-0"><i class="bi bi-chat-dots"></i> Farmer Assistance (Streaming)</h4>
+  </div>
+  <div class="card-body">
+    <p class="card-text text-muted mb-4">Ask questions about your farm conditions, crop issues, or general farming practices.</p>
+    <form id="farmer-form">
+      <div class="mb-3">
+        <label for="user_question" class="form-label">Enter your query:</label>
+        <textarea class="form-control" id="user_question" name="user_question" rows="4"
+          placeholder="e.g., I have brown spots on my tomato leaves, what could it be? My soil pH is 6.7 and moisture is 35%, what crops are suitable?" required></textarea>
+      </div>
+      <div class="d-flex gap-2">
+        <button type="submit" id="get-advice" class="btn btn-success"><i class="bi bi-send"></i> Get Advice</button>
+        <button type="button" id="stop-answer" class="btn btn-danger" disabled><i class="bi bi-stop-circle"></i> Stop</button>
+      </div>
+    </form>
 
-  <div class="mt-4 response-box" id="advice-box" style="white-space: pre-line;"></div>
+    <div class="response-box" id="advice-box">
+        Enter your query above and click "Get Advice". The response will appear here.
+    </div>
+  </div>
 </div>
+{% endblock %}
 
+{% block scripts %}
+{# Keep the existing script block from your original file #}
 <script>
   const form = document.getElementById('farmer-form');
   const getAdviceButton = document.getElementById('get-advice');
@@ -27,30 +38,29 @@
 
   form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      adviceBox.innerHTML = '<em>Loading advice...</em>';
-      // Disable the Get Advice button and enable Stop Answer
+      adviceBox.innerHTML = '<div class="d-flex align-items-center"> <strong role="status">Loading advice...</strong> <div class="spinner-border spinner-border-sm ms-auto" aria-hidden="true"></div> </div>'; // Bootstrap spinner
       getAdviceButton.disabled = true;
       stopAnswerButton.disabled = false;
-      
+
       controller = new AbortController();
       const formData = new FormData(form);
-      
+
       try {
           const response = await fetch('/farmer_help_stream', {
               method: 'POST',
               body: formData,
               signal: controller.signal
           });
-          
+
           if (!response.ok) {
-              adviceBox.innerHTML = 'Something went wrong!';
+              adviceBox.innerHTML = `<span class="text-danger">Error: ${response.status} ${response.statusText}. Please try again.</span>`;
               return;
           }
-          
-          adviceBox.innerHTML = '';
+
+          adviceBox.innerHTML = ''; // Clear loading message
           const reader = response.body.getReader();
           const decoder = new TextDecoder('utf-8');
-          
+
           while (true) {
               const { value, done } = await reader.read();
               if (done) break;
@@ -58,12 +68,11 @@
           }
       } catch (error) {
           if (error.name === 'AbortError') {
-              adviceBox.innerHTML += "\n[Answering stopped by user.]";
+              adviceBox.innerHTML += "\n<strong class='text-warning'>[Answering stopped by user.]</strong>";
           } else {
-              adviceBox.innerHTML += "\n[Error: " + error.message + "]";
+              adviceBox.innerHTML += `\n<strong class='text-danger'>[Error: ${error.message}]</strong>`;
           }
       } finally {
-          // Re-enable Get Advice button and disable Stop Answer button
           getAdviceButton.disabled = false;
           stopAnswerButton.disabled = true;
       }
