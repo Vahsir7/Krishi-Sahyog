@@ -83,7 +83,7 @@ Smart-Agriculture-AI/
 
 2. **Access the application:**
 
-   Open your web browser and navigate to [http://127.0.0.1:8000](http://127.0.0.1:8000) to start using the AI advisor for smart farming.
+   Open your web browser and navigate to [http://127.0.0.1:8000](http://127.0.0.1:8000) to start using the AI advisor for smart farming or go to the local ipv4 address of your system and port 8000 in any device connected to the same network.
 
 3. **Interacting with Agents:**
 
