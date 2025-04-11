@@ -78,7 +78,7 @@ Smart-Agriculture-AI/
 1. **Run the application:**
 
    ```bash
-   uvicorn app:app --reload
+   uvicorn app:app --host 0.0.0.0 --port 8000 --reload
    ```
 
 2. **Access the application:**
