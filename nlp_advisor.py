@@ -17,31 +17,24 @@ embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
 # Normalize and embed context using FAISS
 def prepare_faiss_index(df):
-    # Combine text data into single strings per row
     combined = df.astype(str).agg(" ".join, axis=1).values
     embeddings = embedder.encode(combined)
-    
-    # Create FAISS index
     dimension = embeddings.shape[1]
     index = faiss.IndexFlatL2(dimension)
     index.add(np.array(embeddings))
     return index, combined
 
-# Retrieve top-k matching context rows
 def retrieve_similar_context(query, index, combined_texts, k=3):
     query_vec = embedder.encode([query])
     distances, indices = index.search(np.array(query_vec), k)
     return [combined_texts[i] for i in indices[0]]
 
-# Path to Ollama executable
 OLLAMA_PATH = "/usr/local/bin/ollama"
 
-# Ask crop advisor
 def ask_ollama_crop_advisor(query):
     df = load_farmer_data()
     index, combined = prepare_faiss_index(df)
-    top_matches = retrieve_similar_context(query, index, combined)
-    
+    top_matches = retrieve_similar_context(query, index, combined)    
     context = "\n".join(top_matches)
     prompt = f"""
 You are an expert crop advisor trained on agricultural data.

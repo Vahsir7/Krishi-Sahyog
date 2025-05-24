@@ -2,35 +2,28 @@ import sys
 import os
 import re
 import asyncio
-import sqlite3 # Import sqlite3
-import datetime # Import datetime for timestamps
-import json # Import JSON for logging structured data
-from fastapi import FastAPI, Request, Form, HTTPException # Added HTTPException
+import sqlite3 
+import datetime 
+import json 
+from fastapi import FastAPI, Request, Form, HTTPException 
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-# --- Add project root to Python path ---
-# Adjust based on your project structure if app.py is nested
+
 project_root = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, project_root)
-# --- End Path Addition ---
-
-# --- Import Agent Functions ---
 try:
-    import agents.custom_agent as agent # Import the agent module
-    # Check if the required functions exist
+    import agents.custom_agent as agent 
     if not hasattr(agent, 'find_crop_suggestion_with_guidance'):
          raise ImportError("Function 'find_crop_suggestion_with_guidance' not found in agent module.")
     if not hasattr(agent, 'retrieve_context'):
          raise ImportError("Function 'retrieve_context' not found in agent module.")
-    # Make KBs accessible if needed
     FARMER_KB = agent.FARMER_KB
     MARKET_KB = agent.MARKET_KB
     print("Agent module and required functions loaded successfully.")
 except ImportError as e:
     print(f"Error importing agent module or required functions: {e}")
-    # Provide dummy data/functions if agent fails to load
     FARMER_KB = []
     MARKET_KB = []
     def retrieve_context(query, kb, top_n=3):
@@ -40,19 +33,15 @@ except ImportError as e:
         print("Warning: Using dummy find_crop_suggestion_with_guidance.")
         return {"error": "Crop suggestion agent not loaded.", "input": dict(zip(['Soil_pH', 'Soil_Moisture', 'Temperature_C', 'Rainfall_mm'], farmer_input_data))}
 
-    # Assign dummy functions if agent failed import
     class DummyAgent:
         find_crop_suggestion_with_guidance = find_crop_suggestion_with_guidance
         retrieve_context = retrieve_context
         FARMER_KB = []
         MARKET_KB = []
-    agent = DummyAgent() # Use the dummy agent
+    agent = DummyAgent() 
 
-# --- Initialize FastAPI App ---
 app = FastAPI(title="Krishi Sahyog")
 
-# --- Setup Static Files & Templates ---
-# Adjust paths if your structure is different (e.g., static/templates inside Smart Agri folder)
 static_dir = os.path.join(project_root, "static")
 templates_dir = os.path.join(project_root, "templates")
 
@@ -69,8 +58,7 @@ else:
      print(f"Error: Template directory not found. Exiting.")
      sys.exit(1)
 
-# --- SQLite Database Setup ---
-DATABASE_FILE = os.path.join(project_root, "smart_agri.db") # Place DB in project root
+DATABASE_FILE = os.path.join(project_root, "smart_agri.db") 
 
 def init_db():
     """Initializes the SQLite database and creates tables/indexes if they don't exist."""
@@ -115,12 +103,7 @@ def log_interaction(query: str, context_type: str, retrieved_context: str, respo
     except Exception as e:
         print(f"An unexpected error occurred during interaction logging: {e}")
 
-# Initialize DB at startup
 init_db()
-# --- End SQLite Setup ---
-
-
-# --- Standard Page Routes ---
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     """Serves the home page."""
@@ -148,7 +131,6 @@ async def about_page(request: Request):
     return templates.TemplateResponse("about.html", {"request": request})
 
 
-# --- Crop Suggestion Route (Using New Agent Function) ---
 @app.post("/suggest_crop", response_class=HTMLResponse)
 async def suggest_crop_post(
     request: Request,
@@ -162,48 +144,31 @@ async def suggest_crop_post(
     query_summary = f"Crop Suggestion Query - pH:{soil_ph}, Moist:{soil_moisture}, Temp:{temperature}, Rain:{rainfall}" # Define query early for logging
 
     try:
-        # Prepare input list for the agent function
         farmer_input = [soil_ph, soil_moisture, temperature, rainfall]
 
-        # --- Call the NEW agent function ---
-        # Use agent.function_name notation
         suggestion_data = agent.find_crop_suggestion_with_guidance(farmer_input)
 
-        # --- Log interaction ---
-        # Log the entire suggestion dictionary as a JSON string for detailed context
         context_summary = json.dumps(suggestion_data, default=str) # Convert dict to JSON string
         log_interaction(query=query_summary, context_type='crop_suggestion', retrieved_context=context_summary)
 
     except Exception as e:
         print(f"Error during crop suggestion processing: {e}")
-        # Create an error structure consistent with agent's return format
         suggestion_data = {
             "input": {"Soil_pH": soil_ph, "Soil_Moisture": soil_moisture, "Temperature_C": temperature, "Rainfall_mm": rainfall},
-            "found_sustainable": False, # Ensure these keys exist for template rendering
+            "found_sustainable": False, 
             "found_alternative": False,
-            "error": f"An application error occurred: {e}" # Pass the error message
+            "error": f"An application error occurred: {e}" 
         }
-        # Log the application error itself
         log_interaction(query=query_summary, context_type='crop_suggestion_error', retrieved_context=str(e))
-        # Optionally raise HTTPException if you prefer FastAPI's default error handling
-        # raise HTTPException(status_code=500, detail="Internal Server Error processing crop suggestion.")
-
-
-    # --- Prepare context for the template ---
-    # The suggestion_data dictionary now directly contains everything the template needs
-    # (input, found_sustainable, sustainable_crop, found_alternative, alternative_yield_crop, condition_changes, error)
+        
     template_context = {
         "request": request,
-        "suggestion": suggestion_data # Pass the whole dictionary
+        "suggestion": suggestion_data 
     }
 
-    # Render the same page, now including the suggestion data (or error)
     return templates.TemplateResponse("crop_selection.html", template_context)
 
 
-# --- Streaming Logic and Routes (Copied from your provided code) ---
-
-# Helper function to strip ANSI escape sequences
 def strip_ansi(text: str) -> str:
     ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
     return ansi_escape.sub('', text)
@@ -212,39 +177,34 @@ def strip_ansi(text: str) -> str:
 SPINNER_CHARS = set(['⠁', '⠂', '⠄', '⡀', '⢀', '⠠', '⠐', '⠈',
                      '⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'])
 
-# Async function to stream Ollama responses
-OLLAMA_PATH = "/usr/local/bin/ollama"  # Adjust if your path is different
+OLLAMA_PATH = "/usr/local/bin/ollama"  
 
 async def stream_query_ollama(prompt: str):
     """Streams the response from the Ollama model character by character."""
     process = None
     try:
-        # Consider adding model selection as a parameter if needed
         process = await asyncio.create_subprocess_exec(
-            OLLAMA_PATH, "run", "llama2:7b-chat", # Ensure this model exists
+            OLLAMA_PATH, "run", "llama2:7b-chat", 
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        # Send the prompt to Ollama
         if process.stdin:
             process.stdin.write(prompt.encode("utf-8"))
             await process.stdin.drain()
-            process.stdin.close() # Close stdin to signal end of input
+            process.stdin.close() 
 
-        # Read stdout character by character
         while process.stdout:
             char_bytes = await process.stdout.read(1)
             if not char_bytes:
-                break # End of stream
+                break 
             try:
                 decoded_char = char_bytes.decode("utf-8")
                 clean_char = strip_ansi(decoded_char) # Remove ANSI codes
-                # Filter out spinner characters common in Ollama output
+                
                 if clean_char and clean_char not in SPINNER_CHARS:
-                    yield clean_char # Yield the clean character
+                    yield clean_char 
             except UnicodeDecodeError:
-                # Skip bytes that don't form a valid UTF-8 character
                 continue
 
     except FileNotFoundError:
@@ -256,7 +216,6 @@ async def stream_query_ollama(prompt: str):
         print(error_msg)
         yield error_msg
     finally:
-        # Ensure the subprocess is cleaned up properly
         if process:
             if process.stderr:
                 try:
@@ -266,7 +225,6 @@ async def stream_query_ollama(prompt: str):
                 except Exception as e_stderr:
                     print(f"Error reading Ollama stderr: {e_stderr}")
             try:
-                # Ensure process terminates
                  if process.returncode is None:
                     process.terminate()
                  await process.wait()
@@ -274,13 +232,11 @@ async def stream_query_ollama(prompt: str):
             except Exception as e_wait:
                  print(f"Error waiting for/terminating Ollama process: {e_wait}")
 
-
-# Streaming response for farmer help
 @app.post("/farmer_help_stream", response_class=StreamingResponse)
 async def farmer_help_stream(request: Request, user_question: str = Form(...)):
     """Handles farmer queries using RAG and streams Ollama response."""
-    context = agent.retrieve_context(user_question, agent.FARMER_KB, top_n=3) # Use agent namespace
-    log_interaction(query=user_question, context_type='farmer', retrieved_context=str(context)) # Log context as string
+    context = agent.retrieve_context(user_question, agent.FARMER_KB, top_n=3) 
+    log_interaction(query=user_question, context_type='farmer', retrieved_context=str(context)) 
     prompt = f"""
 You are an expert agricultural AI assistant trained on Indian farming data.
 
@@ -292,16 +248,14 @@ Farmer's Query:
 
 Based *only* on the provided context and the farmer's query, suggest the best advice, ideal crops, and helpful conditions. If the context seems irrelevant, state that the provided details don't match the query well and offer general advice if possible.
 """
-    # Return a streaming response from Ollama
     return StreamingResponse(stream_query_ollama(prompt), media_type="text/plain; charset=utf-8")
 
 
-# Streaming response for marketing help
 @app.post("/marketing_help_stream", response_class=StreamingResponse)
 async def marketing_help_stream(request: Request, user_question: str = Form(...)):
     """Handles marketing queries using RAG and streams Ollama response."""
-    context = agent.retrieve_context(user_question, agent.MARKET_KB, top_n=3) # Use agent namespace
-    log_interaction(query=user_question, context_type='market', retrieved_context=str(context)) # Log context as string
+    context = agent.retrieve_context(user_question, agent.MARKET_KB, top_n=3) 
+    log_interaction(query=user_question, context_type='market', retrieved_context=str(context)) 
     prompt = f"""
 You are an expert agriculture market analyst AI trained on market dynamics and economic factors.
 
@@ -313,26 +267,11 @@ Marketing Query:
 
 Based *only* on the provided context and the marketing query, suggest insights, pricing strategies, demand analysis, or market predictions. If the context seems irrelevant, state that the provided details don't match the query well and offer general advice if possible.
 """
-    # Return a streaming response from Ollama
     return StreamingResponse(stream_query_ollama(prompt), media_type="text/plain; charset=utf-8")
 
 
-# --- Removed Redundant Placeholder Route ---
-# @app.post("/crop_selection", ...) was removed as /suggest_crop handles this now.
-
-
-# --- Run the app (for development) ---
 if __name__ == "__main__":
-    # Optional: Add checks here to verify agent data loading status if needed
-    # try:
-    #     if agent.FARMER_DF.empty or agent.nn_model is None: # Example check
-    #         print("\n*** Warning: Agent data/model may not be loaded. Crop suggestions might fail. ***\n")
-    # except AttributeError:
-    #      print("\n*** Warning: Could not check agent data status. ***\n")
-
     print(f"Starting Uvicorn server...")
     print(f"Access the application at http://127.0.0.1:8000")
-    # Use uvicorn.run for programmatic execution
     import uvicorn
-    # reload=True is helpful for development
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
