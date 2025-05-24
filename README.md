@@ -25,7 +25,6 @@
 - **User-Friendly Interface:** Built with HTML and Python to ensure an accessible user experience.
 - **Modular Design:** Easily extend or modify agents and functionalities to suit your specific agricultural needs.
 
-
 ---
 
 ## Project Structure
@@ -52,7 +51,6 @@ Smart-Agriculture-AI/
    git clone https://github.com/Vahsir7/Smart-Agriculture-Ai.git
    cd Smart-Agriculture-Ai
    ```
-
 2. **Create a virtual environment (optional but recommended):**
 
    ```bash
@@ -60,13 +58,11 @@ Smart-Agriculture-AI/
    source venv/bin/activate   
    # On Windows use: venv\Scripts\activate
    ```
-
 3. **Install the dependencies:**
 
    ```bash
    pip install -r requirements.txt
    ```
-
 4. **Set up your SQLite database:**
 
    The repository includes a pre-built `smart_agri.db`. If you need to update or initialize the database schema, refer to the project documentation or scripts within the `agents` folder.
@@ -78,13 +74,11 @@ Smart-Agriculture-AI/
 1. **Run the application:**
 
    ```bash
-   uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+   uvicorn app:app --host 0.0.0.0 --port 8001 --reload
    ```
-
 2. **Access the application:**
 
-   Open your web browser and navigate to [http://127.0.0.1:8000](http://127.0.0.1:8000) to start using the AI advisor for smart farming or go to the local ipv4 address of your system and port 8000 in any device connected to the same network.
-
+   Open your web browser and navigate to [http://127.0.0.1:8001](http://127.0.0.1:8000) to start using the AI advisor for smart farming or go to the local ipv4 address of your system and port 8000 in any device connected to the same network.
 3. **Interacting with Agents:**
 
    The application coordinates multiple agents that analyze the data from your datasets. For instance, the `nlp_advisor.py` processes natural language queries to provide context-specific recommendations.
@@ -94,7 +88,7 @@ Smart-Agriculture-AI/
 ## Contact
 
 For any questions, suggestions, or issues, please contact:
-**Email:** [rishavbairagya@gmail.com](mailto:rishavbairagya@gmail.com)  
+**Email:** [rishavbairagya@gmail.com](mailto:rishavbairagya@gmail.com)
 **Phone:** +91 9477455599
 
 ---
