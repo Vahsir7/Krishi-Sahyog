@@ -7,6 +7,13 @@ import datetime
 import json 
 from fastapi import FastAPI, Request, Form, HTTPException 
 from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import JSONResponse
+from fastapi import Body
+import pandas as pd
+import faiss
+from sentence_transformers import SentenceTransformer
+from deep_translator import GoogleTranslator
+from langdetect import detect, LangDetectException
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -57,6 +64,51 @@ if os.path.isdir(templates_dir):
 else:
      print(f"Error: Template directory not found. Exiting.")
      sys.exit(1)
+
+# --- Multilingual QnA Model and Index Setup ---
+DATA_FILE = 'farming_qna_english.csv'  # Using a new file name to avoid confusion
+FAISS_INDEX_FILE = 'farming_qna.index'
+MODEL_NAME = 'google/muril-base-cased'
+
+# --- Load Sentence Transformer Model ---
+try:
+    print(f"Loading sentence transformer model: {MODEL_NAME}...")
+    multilingual_model = SentenceTransformer(MODEL_NAME)
+    print("Model loaded successfully.")
+except Exception as e:
+    print(f"Error loading model: {e}")
+    multilingual_model = None
+
+# --- Prepare Data and FAISS Index ---
+if os.path.exists(DATA_FILE) and not os.path.exists(FAISS_INDEX_FILE):
+    try:
+        print("Data file found, but FAISS index not found. Creating index...")
+        df_multi = pd.read_csv(DATA_FILE)
+        # Ensure the 'question' column exists
+        if 'question' not in df_multi.columns:
+            raise ValueError("CSV must have a 'question' column containing English questions.")
+        questions = df_multi['question'].tolist()
+        print(f"Generating embeddings for {len(questions)} English questions...")
+        question_embeddings = multilingual_model.encode(questions, convert_to_tensor=True, show_progress_bar=True)
+        question_embeddings = question_embeddings.cpu().numpy()
+        embedding_dim = question_embeddings.shape[1]
+        index_multi = faiss.IndexFlatL2(embedding_dim)
+        index_multi.add(question_embeddings)
+        faiss.write_index(index_multi, FAISS_INDEX_FILE)
+        print(f"FAISS index created and saved to {FAISS_INDEX_FILE}.")
+    except Exception as e:
+        print(f"Error creating FAISS index: {e}")
+
+# --- Load FAISS Index and Data ---
+try:
+    print("Loading FAISS index and data file for multilingual chat...")
+    index_multi = faiss.read_index(FAISS_INDEX_FILE)
+    df_multi = pd.read_csv(DATA_FILE)
+    print("FAISS index and data loaded successfully.")
+except Exception as e:
+    print(f"Could not load FAISS index or data file: {e}")
+    index_multi = None
+    df_multi = None
 
 DATABASE_FILE = os.path.join(project_root, "smart_agri.db") 
 
@@ -276,3 +328,85 @@ if __name__ == "__main__":
     import uvicorn
     uvicorn.run("app:app", host="0.0.0.0", port=8001, reload=True)
     print("Uvicorn server started successfully.")
+
+
+# --- Multilingual Chat Route ---
+from fastapi import APIRouter
+
+
+# Accept both JSON and form POSTs for /multilingual_chat
+from fastapi import Form
+from fastapi import Request
+from fastapi.responses import JSONResponse
+from typing import Optional
+
+# --- Multilingual Chat Web Page Route ---
+@app.get("/multilingual_chat", response_class=HTMLResponse)
+async def multilingual_chat_page(request: Request):
+    """Serves the multilingual chat web page."""
+    return templates.TemplateResponse("multilingual_chat.html", {"request": request})
+
+@app.post("/multilingual_chat")
+async def multilingual_chat(
+    request: Request,
+    message: Optional[str] = Form(None),
+    payload: Optional[dict] = None
+):
+    """Multilingual QnA endpoint using FAISS, SentenceTransformer, and deep-translator."""
+    if index_multi is None or df_multi is None or multilingual_model is None:
+        return JSONResponse({"error": "Server is not ready. Index or data not loaded."}, status_code=500)
+
+    # Support both JSON and form POSTs
+    user_message = None
+    if request.headers.get("content-type", "").startswith("application/json"):
+        try:
+            data = await request.json()
+            user_message = data.get("message")
+        except Exception:
+            user_message = None
+    elif message:
+        user_message = message
+
+    if not user_message:
+        return JSONResponse({"error": "Message cannot be empty."}, status_code=400)
+
+    try:
+        print(f"Received message: {user_message}")
+
+        # --- STEP 1: DETECT USER'S LANGUAGE ---
+        try:
+            target_lang = detect(user_message)
+            print(f"Detected language: {target_lang}")
+        except LangDetectException:
+            print("Could not detect language, defaulting to English ('en').")
+            target_lang = 'en'
+
+        # --- STEP 2: RETRIEVE BEST ENGLISH ANSWER ---
+        query_embedding = multilingual_model.encode([user_message])
+        k = 1
+        distances, indices = index_multi.search(query_embedding, k)
+        best_match_index = indices[0][0]
+        # Retrieve the English answer from the dataframe
+        retrieved_english_answer = df_multi.iloc[best_match_index]['answer']
+
+        # --- STEP 3: TRANSLATE THE ANSWER BACK TO USER'S LANGUAGE (Using deep-translator) ---
+        final_response = retrieved_english_answer
+        # Only translate if the target language is not English
+        if target_lang != 'en':
+            try:
+                print(f"Translating answer to '{target_lang}'...")
+                translated_answer = GoogleTranslator(source='auto', target=target_lang).translate(retrieved_english_answer)
+                if translated_answer:
+                    final_response = translated_answer
+                else:
+                    final_response = retrieved_english_answer
+            except Exception as trans_error:
+                print(f"Translation error: {trans_error}")
+                final_response = retrieved_english_answer
+
+        print(f"Sending response: {final_response}")
+        return JSONResponse({"response": final_response})
+
+    except Exception as e:
+        print(f"An error occurred during chat processing: {e}")
+        return JSONResponse({"error": "An internal error occurred."}, status_code=500)
