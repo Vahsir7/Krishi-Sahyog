@@ -6,3 +6,7 @@ __pycache__
 *.pyd
 __pycache__/
 **/__pycache__/
+ubuntu-venv
+data/
+*.csv
+*.index
