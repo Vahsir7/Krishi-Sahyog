@@ -118,15 +118,6 @@ Krishi-Sahyog/
 
 ---
 
-## 🔮 Roadmap
-
-* [ ] Weather-based forecasting integration
-* [ ] Voice-enabled queries for farmers
-* [ ] Enhanced dashboards for market visualization
-* [ ] Expand multilingual dataset for better regional coverage
-
----
-
 ## 🤝 Contributing
 
 Contributions are welcome!
@@ -143,3 +134,4 @@ For questions, suggestions, or collaborations:
 ---
 
 🌾 *Happy Farming with AI!* 🌾
+
