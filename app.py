@@ -16,6 +16,11 @@ from deep_translator import GoogleTranslator
 from langdetect import detect, LangDetectException
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fastapi import APIRouter
+from typing import Optional
+
+from dotenv import load_dotenv
+load_dotenv()
 
 
 project_root = os.path.dirname(os.path.abspath(__file__))
@@ -65,12 +70,12 @@ else:
      print(f"Error: Template directory not found. Exiting.")
      sys.exit(1)
 
-# --- Multilingual QnA Model and Index Setup ---
-DATA_FILE = 'farming_qna_english.csv'  # Using a new file name to avoid confusion
-FAISS_INDEX_FILE = 'farming_qna.index'
-MODEL_NAME = 'google/muril-base-cased'
+# Multilingual QnA Model and Index Setup
+DATA_FILE = os.environ.get("DATA_FILE")
+FAISS_INDEX_FILE = os.environ.get("FAISS_INDEX_FILE")
+MODEL_NAME = os.environ.get("MODEL_NAME")
 
-# --- Load Sentence Transformer Model ---
+# Load Sentence Transformer Model
 try:
     print(f"Loading sentence transformer model: {MODEL_NAME}...")
     multilingual_model = SentenceTransformer(MODEL_NAME)
@@ -79,12 +84,11 @@ except Exception as e:
     print(f"Error loading model: {e}")
     multilingual_model = None
 
-# --- Prepare Data and FAISS Index ---
+# Prepare Data and FAISS Index 
 if os.path.exists(DATA_FILE) and not os.path.exists(FAISS_INDEX_FILE):
     try:
         print("Data file found, but FAISS index not found. Creating index...")
         df_multi = pd.read_csv(DATA_FILE)
-        # Ensure the 'question' column exists
         if 'question' not in df_multi.columns:
             raise ValueError("CSV must have a 'question' column containing English questions.")
         questions = df_multi['question'].tolist()
@@ -99,7 +103,7 @@ if os.path.exists(DATA_FILE) and not os.path.exists(FAISS_INDEX_FILE):
     except Exception as e:
         print(f"Error creating FAISS index: {e}")
 
-# --- Load FAISS Index and Data ---
+# Load FAISS Index and Data 
 try:
     print("Loading FAISS index and data file for multilingual chat...")
     index_multi = faiss.read_index(FAISS_INDEX_FILE)
@@ -229,14 +233,15 @@ def strip_ansi(text: str) -> str:
 SPINNER_CHARS = set(['⠁', '⠂', '⠄', '⡀', '⢀', '⠠', '⠐', '⠈',
                      '⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'])
 
-OLLAMA_PATH = "/usr/local/bin/ollama"  
+OLLAMA_PATH = os.environ.get("OLLAMA_PATH")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL")
 
 async def stream_query_ollama(prompt: str):
     """Streams the response from the Ollama model character by character."""
     process = None
     try:
         process = await asyncio.create_subprocess_exec(
-            OLLAMA_PATH, "run", "llama2:7b-chat", 
+            OLLAMA_PATH, "run", OLLAMA_MODEL,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
@@ -321,25 +326,6 @@ Based *only* on the provided context and the marketing query, suggest insights, 
 """
     return StreamingResponse(stream_query_ollama(prompt), media_type="text/plain; charset=utf-8")
 
-
-if __name__ == "__main__":
-    print(f"Starting Uvicorn server...")
-    print(f"Access the application at http://127.0.0.1:8000")
-    import uvicorn
-    uvicorn.run("app:app", host="0.0.0.0", port=8001, reload=True)
-    print("Uvicorn server started successfully.")
-
-
-# --- Multilingual Chat Route ---
-from fastapi import APIRouter
-
-
-# Accept both JSON and form POSTs for /multilingual_chat
-from fastapi import Form
-from fastapi import Request
-from fastapi.responses import JSONResponse
-from typing import Optional
-
 # --- Multilingual Chat Web Page Route ---
 @app.get("/multilingual_chat", response_class=HTMLResponse)
 async def multilingual_chat_page(request: Request):
@@ -356,7 +342,6 @@ async def multilingual_chat(
     if index_multi is None or df_multi is None or multilingual_model is None:
         return JSONResponse({"error": "Server is not ready. Index or data not loaded."}, status_code=500)
 
-    # Support both JSON and form POSTs
     user_message = None
     if request.headers.get("content-type", "").startswith("application/json"):
         try:
@@ -373,7 +358,7 @@ async def multilingual_chat(
     try:
         print(f"Received message: {user_message}")
 
-        # --- STEP 1: DETECT USER'S LANGUAGE ---
+        # DETECT USER'S LANGUAGE
         try:
             target_lang = detect(user_message)
             print(f"Detected language: {target_lang}")
@@ -381,17 +366,15 @@ async def multilingual_chat(
             print("Could not detect language, defaulting to English ('en').")
             target_lang = 'en'
 
-        # --- STEP 2: RETRIEVE BEST ENGLISH ANSWER ---
+        # RETRIEVE BEST ENGLISH ANSWER
         query_embedding = multilingual_model.encode([user_message])
         k = 1
         distances, indices = index_multi.search(query_embedding, k)
         best_match_index = indices[0][0]
-        # Retrieve the English answer from the dataframe
         retrieved_english_answer = df_multi.iloc[best_match_index]['answer']
 
-        # --- STEP 3: TRANSLATE THE ANSWER BACK TO USER'S LANGUAGE (Using deep-translator) ---
+        # TRANSLATE THE ANSWER BACK TO USER'S LANGUAGE (Using deep-translator)
         final_response = retrieved_english_answer
-        # Only translate if the target language is not English
         if target_lang != 'en':
             try:
                 print(f"Translating answer to '{target_lang}'...")
@@ -410,3 +393,10 @@ async def multilingual_chat(
     except Exception as e:
         print(f"An error occurred during chat processing: {e}")
         return JSONResponse({"error": "An internal error occurred."}, status_code=500)
+    
+if __name__ == "__main__":
+    print(f"Starting Uvicorn server...")
+    print(f"Access the application at http://127.0.0.1:8000")
+    import uvicorn
+    uvicorn.run("app:app", host="0.0.0.0", port=8001, reload=True)
+    print("Uvicorn server started successfully.")
