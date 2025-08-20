@@ -5,13 +5,10 @@ import pandas as pd
 from sentence_transformers import SentenceTransformer
 from langdetect import detect, LangDetectException
 from deep_translator import GoogleTranslator
+from dotenv import load_dotenv
+load_dotenv()
 
-# --- Configuration ---
-# This will be dynamically set from app.py to handle different datasets
-MODEL_NAME = 'google/muril-base-cased'
-
-# --- Global In-Memory Storage ---
-# We use a dictionary to hold models and data for different advisors (farmer, market)
+MODEL_NAME = os.getenv("MODEL_NAME")
 nlp_resources = {}
 
 def initialize_advisor(advisor_name: str, data_file: str):
@@ -38,7 +35,6 @@ def initialize_advisor(advisor_name: str, data_file: str):
         if not os.path.exists(faiss_index_file):
             print(f"FAISS index for '{advisor_name}' not found. Creating one...")
             df_temp = pd.read_csv(data_file)
-            # Use a generic 'question' or 'query' column if available, otherwise combine all
             if 'question' in df_temp.columns:
                 text_to_embed = df_temp['question'].dropna().tolist()
             elif 'query' in df_temp.columns:
