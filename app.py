@@ -396,7 +396,8 @@ async def multilingual_chat(
     
 if __name__ == "__main__":
     print(f"Starting Uvicorn server...")
-    print(f"Access the application at http://127.0.0.1:8000")
+    print(f"Access the application at http://127.0.0.1:8080")
     import uvicorn
-    uvicorn.run("app:app", host="0.0.0.0", port=8001, reload=True)
+    PORT = int(os.environ.get("PORT", 8080))
+    uvicorn.run("app:app", host="0.0.0.0", port=PORT, reload=True)
     print("Uvicorn server started successfully.")
