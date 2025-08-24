@@ -54,7 +54,9 @@
 
           if (!response.ok) {
               const errorBody = await response.text();
-              insightsBox.innerHTML = `<span class="text-danger">Error: ${response.status} ${response.statusText}.</span>` + (errorBody ? `<br><small class='text-danger'>Details: ${errorBody}</small>` : '');
+              let errorHtml = `<span class="text-danger">Error: ${response.status} ${response.statusText}.</span>` + (errorBody ? `<br><small class='text-danger'>Details: ${errorBody}</small>` : '');
+              errorHtml += "<br><small class='text-muted'>If the problem persists, please contact the admin via the <a href='/about'>About Us</a> page.</small>";
+              insightsBox.innerHTML = errorHtml;
               return;
           }
 
@@ -71,7 +73,8 @@
            if (error.name === 'AbortError') {
               insightsBox.innerHTML += "\n<strong class='text-warning'>[Answering stopped by user.]</strong>";
           } else {
-              insightsBox.innerHTML += `\n<strong class='text-danger'>[Error fetching stream: ${error.message}]</strong>`;
+              insightsBox.innerHTML = `<strong class='text-danger'>[Error fetching stream: ${error.message}]</strong>`;
+              insightsBox.innerHTML += "<br><small class='text-muted'>If the problem persists, please contact the admin via the <a href='/about'>About Us</a> page.</small>";
           }
       } finally {
           getInsightsButton.disabled = false;

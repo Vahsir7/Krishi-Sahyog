@@ -18,6 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi import APIRouter
 from typing import Optional
+import httpx
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -233,62 +234,49 @@ def strip_ansi(text: str) -> str:
 SPINNER_CHARS = set(['⠁', '⠂', '⠄', '⡀', '⢀', '⠠', '⠐', '⠈',
                      '⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'])
 
-OLLAMA_PATH = os.environ.get("OLLAMA_PATH")
+OLLAMA_URL = os.environ.get("OLLAMA_URL")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL")
 
 async def stream_query_ollama(prompt: str):
-    """Streams the response from the Ollama model character by character."""
-    process = None
     try:
-        process = await asyncio.create_subprocess_exec(
-            OLLAMA_PATH, "run", OLLAMA_MODEL,
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        if process.stdin:
-            process.stdin.write(prompt.encode("utf-8"))
-            await process.stdin.drain()
-            process.stdin.close() 
+        async with httpx.AsyncClient(timeout=None) as client:
+            async with client.stream(
+                "POST",
+                OLLAMA_URL,
+                json={"model": OLLAMA_MODEL, "prompt": prompt},
+            ) as response:
 
-        while process.stdout:
-            char_bytes = await process.stdout.read(1)
-            if not char_bytes:
-                break 
-            try:
-                decoded_char = char_bytes.decode("utf-8")
-                clean_char = strip_ansi(decoded_char) # Remove ANSI codes
-                
-                if clean_char and clean_char not in SPINNER_CHARS:
-                    yield clean_char 
-            except UnicodeDecodeError:
-                continue
+                if response.status_code != 200:
+                    # Debug log
+                    print(f"[DEBUG] Ollama returned {response.status_code}", file=sys.stderr)
+                    try:
+                        body = await response.aread()
+                        print(f"[DEBUG] Response body: {body.decode(errors='ignore')}", file=sys.stderr)
+                    except Exception as e:
+                        print(f"[DEBUG] Could not read error body: {e}", file=sys.stderr)
 
-    except FileNotFoundError:
-        error_msg = f"[Error: Ollama executable not found at {OLLAMA_PATH}. Please check the path.]"
-        print(error_msg)
-        yield error_msg
+                    # ❌ FIX: use normal generator, not async
+                    def error_stream():
+                        yield b"Ollama server is currently down. Please contact us at https://github.com/Vahsir7/Krishi-Sahyog#about-us"
+
+                    return StreamingResponse(error_stream(), media_type="text/plain")
+
+                # ✅ Success → stream chunks
+                async def event_stream():
+                    async for chunk in response.aiter_bytes():
+                        yield chunk
+                return StreamingResponse(event_stream(), media_type="application/json")
+
     except Exception as e:
-        error_msg = f"[Error: Could not run Ollama - {e}]"
-        print(error_msg)
-        yield error_msg
-    finally:
-        if process:
-            if process.stderr:
-                try:
-                    stderr_output = await process.stderr.read()
-                    if stderr_output:
-                         print(f"Ollama stderr: {stderr_output.decode(errors='ignore')}")
-                except Exception as e_stderr:
-                    print(f"Error reading Ollama stderr: {e_stderr}")
-            try:
-                 if process.returncode is None:
-                    process.terminate()
-                 await process.wait()
-                 print(f"Ollama process finished with code: {process.returncode}")
-            except Exception as e_wait:
-                 print(f"Error waiting for/terminating Ollama process: {e_wait}")
+        # Debug log
+        print(f"[DEBUG] Exception while contacting Ollama: {e}", file=sys.stderr)
 
+        # ❌ FIX: use normal generator, not async
+        def error_stream():
+            yield b"Ollama server is currently down. Please contact us at https://github.com/Vahsir7/Krishi-Sahyog#about-us"
+
+        return StreamingResponse(error_stream(), media_type="text/plain")
+    
 @app.post("/farmer_help_stream", response_class=StreamingResponse)
 async def farmer_help_stream(request: Request, user_question: str = Form(...)):
     """Handles farmer queries using RAG and streams Ollama response."""
@@ -305,7 +293,7 @@ Farmer's Query:
 
 Based *only* on the provided context and the farmer's query, suggest the best advice, ideal crops, and helpful conditions. If the context seems irrelevant, state that the provided details don't match the query well and offer general advice if possible.
 """
-    return StreamingResponse(stream_query_ollama(prompt), media_type="text/plain; charset=utf-8")
+    return await stream_query_ollama(prompt)
 
 
 @app.post("/marketing_help_stream", response_class=StreamingResponse)
@@ -324,7 +312,7 @@ Marketing Query:
 
 Based *only* on the provided context and the marketing query, suggest insights, pricing strategies, demand analysis, or market predictions. If the context seems irrelevant, state that the provided details don't match the query well and offer general advice if possible.
 """
-    return StreamingResponse(stream_query_ollama(prompt), media_type="text/plain; charset=utf-8")
+    return await stream_query_ollama(prompt)
 
 # --- Multilingual Chat Web Page Route ---
 @app.get("/multilingual_chat", response_class=HTMLResponse)
@@ -401,3 +389,4 @@ if __name__ == "__main__":
     PORT = int(os.environ.get("PORT", 8080))
     uvicorn.run("app:app", host="0.0.0.0", port=PORT, reload=True)
     print("Uvicorn server started successfully.")
+    
