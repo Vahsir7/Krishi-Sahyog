@@ -4,7 +4,9 @@ emoji: 🌾
 colorFrom: green
 colorTo: yellow
 sdk: docker
-main: app.py
+sdk_version: "1.0.0"
+app_file: app.py
+pinned: false
 ---
 # Krishi Sahyog 🌱🤖
 
