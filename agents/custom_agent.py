@@ -4,8 +4,15 @@ import asyncio
 import re 
 import numpy as np 
 from sklearn.neighbors import NearestNeighbors
+import os
+import requests
+import json
 
-OLLAMA_PATH = "/usr/local/bin/ollama"
+from dotenv import load_dotenv
+load_dotenv()
+
+OLLAMA_URL = os.environ.get("OLLAMA_URL")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL")
 
 # -------------------------------
 # Load CSV Data Once at Startup
@@ -159,32 +166,37 @@ def find_crop_suggestion_with_guidance(farmer_input_data):
 # Query Ollama with a Constructed Prompt (Non-Streaming Sync version)
 # -------------------------------
 def query_ollama(prompt):
-    print(f"Querying Ollama with prompt (sync): {prompt[:200]}...") 
+    """Queries the Ollama API with a prompt and returns the response synchronously."""
+    print(f"Querying Ollama with prompt (sync): {prompt[:200]}...")
+    if not OLLAMA_URL or not OLLAMA_MODEL:
+        error_msg = "[Error: OLLAMA_URL or OLLAMA_MODEL environment variable not set.]"
+        print(error_msg)
+        return error_msg
+
+    api_url = f"{OLLAMA_URL}/api/generate"
+    payload = {
+        "model": OLLAMA_MODEL,
+        "prompt": prompt,
+        "stream": False
+    }
+
     try:
-        result = subprocess.run(
-            [OLLAMA_PATH, "run", "llama2:7b-chat"],
-            input=prompt,
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=60 
-        )
-        response = result.stdout.strip()
-        if not response:
+        response = requests.post(api_url, json=payload, timeout=60)
+        response.raise_for_status()  # Raise an HTTPError for bad responses (4xx or 5xx)
+
+        data = response.json()
+        ollama_response = data.get("response", "").strip()
+
+        if not ollama_response:
             print("Warning: Ollama returned an empty response.")
             return "Error: Model did not return advice."
-        print(f"Ollama response received (sync).")
-        return response
-    except FileNotFoundError:
-        print(f"Error: Ollama executable not found at {OLLAMA_PATH}")
-        return "Error: Ollama is not configured correctly."
-    except subprocess.CalledProcessError as e:
-        print(f"Error: Ollama process failed with exit code {e.returncode}")
-        print(f"Stderr: {e.stderr}")
-        return f"Error: Ollama failed to process the request. {e.stderr}"
-    except subprocess.TimeoutExpired:
-        print("Error: Ollama query timed out.")
-        return "Error: The request to the model timed out."
+
+        print("Ollama response received (sync).")
+        return ollama_response
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error: Could not connect to Ollama at {api_url}. Details: {e}")
+        return f"Error: Could not connect to Ollama. {e}"
     except Exception as e:
         print(f"An unexpected error occurred during Ollama query: {e}")
         return "Error: An unexpected error occurred while getting advice."
