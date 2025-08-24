@@ -1,3 +1,11 @@
+---
+title: Krishi Sahyog
+emoji: 🌾
+colorFrom: green
+colorTo: yellow
+sdk: docker
+main: app.py
+---
 # Krishi Sahyog 🌱🤖
 
 **Krishi Sahyog** is a multi-agent AI advisor for smart farming.
